@@ -1,21 +1,18 @@
-# 🛒 API REST – Tienda Virtual | SENA
+INTEGRANTES: ANGEL GABRIEL VILLADA JIJMENEZ
+ERICK SNEIDER JIMENEZ LOPEZ 
+FICHA:3229209
+
+ 
+ 
+ 
+ API REST – Tienda Virtual | SENA
 
 > **Actividad:** Desarrollo de APIs REST con Node.js  
 > **Programa:** Tecnología en Análisis y Desarrollo de Software  
 > **Instructor:** Mateo  
 > **Proyecto elegido:** Proyecto 1 – Tienda Virtual
 
----
 
-##  Integrantes del Grupo
-
-| Integrante | Rol |
-|-----------|-----|
-| _________________________ | Tech Lead |
-| _________________________ | Backend Developer |
-| _________________________ | QA / Documentador |
-
----
 
 ##  Instalación y Ejecución
 
