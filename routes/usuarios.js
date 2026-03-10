@@ -1,111 +1,314 @@
 const express = require('express');
 const router = express.Router();
+const db = require('../db');
 
-// Base de datos en memoria
-let usuarios = [
-  { id: 1, nombre: 'Esneider Jiménez', email: 'esneider@email.com', rol: 'admin',    activo: true },
-  { id: 2, nombre: 'María López',      email: 'maria@email.com',    rol: 'cliente',  activo: true },
-  { id: 3, nombre: 'Carlos Ruiz',      email: 'carlos@email.com',   rol: 'cliente',  activo: true },
-  { id: 4, nombre: 'Ana Gómez',        email: 'ana@email.com',      rol: 'vendedor', activo: false },
-];
-let nextId = 5;
-
-// GET /usuarios - Obtener todos (con filtro dinámico por query params)
-// Ejemplo: GET /usuarios?rol=admin  |  GET /usuarios?activo=true
+// ═══════════════════════════════════════
+// GET /usuarios — Listar todos
+// Filtros: ?rol= ?activo= ?nombre=
+// Header: Authorization
+// ═══════════════════════════════════════
 router.get('/', (req, res) => {
+
   const token = req.headers['authorization'] || 'No proporcionado';
-  const filtros = req.query;
-  let data = [...usuarios];
+  const { nombre, rol, activo } = req.query;
 
-  if (Object.keys(filtros).length > 0) {
-    data = data.filter(u =>
-      Object.entries(filtros).every(([k, v]) =>
-        u[k] !== undefined &&
-        u[k].toString().toLowerCase().includes(v.toLowerCase())
-      )
-    );
+  let sql = 'SELECT * FROM usuarios WHERE 1=1';
+  const params = [];
+
+  if (nombre) {
+    sql += ' AND nombre LIKE ?';
+    params.push(`%${nombre}%`);
   }
 
-  res.json({
-    success: true,
-    total: data.length,
-    filtros_aplicados: filtros,
-    autorization_header: token,
-    data
+  if (rol) {
+    sql += ' AND rol = ?';
+    params.push(rol);
+  }
+
+  if (activo !== undefined) {
+    sql += ' AND activo = ?';
+    params.push(activo === 'true' ? 1 : 0);
+  }
+
+  db.all(sql, params, (err, rows) => {
+
+    if (err) {
+      return res.status(500).json({
+        success: false,
+        message: err.message
+      });
+    }
+
+    res.json({
+      success: true,
+      total: rows.length,
+      authorization_header: token,
+      data: rows
+    });
+
   });
+
 });
 
+
+// ═══════════════════════════════════════
 // GET /usuarios/:id
+// ═══════════════════════════════════════
 router.get('/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const usuario = usuarios.find(u => u.id === id);
 
-  if (!usuario) {
-    return res.status(404).json({ success: false, message: `Usuario con id ${id} no encontrado` });
-  }
+  const { id } = req.params;
 
-  res.json({ success: true, data: usuario });
+  db.get(
+    'SELECT * FROM usuarios WHERE id = ?',
+    [id],
+    (err, row) => {
+
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: err.message
+        });
+      }
+
+      if (!row) {
+        return res.status(404).json({
+          success: false,
+          message: `Usuario con id ${id} no encontrado`
+        });
+      }
+
+      res.json({
+        success: true,
+        data: row
+      });
+
+    }
+  );
+
 });
 
-// POST /usuarios
+
+// ═══════════════════════════════════════
+// POST /usuarios — Crear usuario
+// ═══════════════════════════════════════
 router.post('/', (req, res) => {
+
   const { nombre, email, rol } = req.body;
 
   if (!nombre || !email) {
     return res.status(400).json({
       success: false,
-      message: 'Faltan campos obligatorios: nombre, email'
+      message: 'Los campos nombre y email son obligatorios'
     });
   }
 
-  // Verificar email duplicado
-  const existe = usuarios.find(u => u.email === email);
-  if (existe) {
-    return res.status(400).json({ success: false, message: 'Ya existe un usuario con ese email' });
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({
+      success: false,
+      message: 'El formato del email no es válido'
+    });
   }
 
-  const nuevo = {
-    id: nextId++,
-    nombre,
-    email,
-    rol: rol || 'cliente',
-    activo: true
-  };
+  const rolesValidos = ['admin', 'cliente', 'vendedor'];
 
-  usuarios.push(nuevo);
-  res.status(201).json({ success: true, message: 'Usuario registrado correctamente', data: nuevo });
+  if (rol && !rolesValidos.includes(rol)) {
+    return res.status(400).json({
+      success: false,
+      message: `rol debe ser uno de: ${rolesValidos.join(', ')}`
+    });
+  }
+
+  db.get(
+    'SELECT id FROM usuarios WHERE email = ?',
+    [email.toLowerCase()],
+    (err, row) => {
+
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: err.message
+        });
+      }
+
+      if (row) {
+        return res.status(400).json({
+          success: false,
+          message: `El email "${email}" ya está registrado`
+        });
+      }
+
+      db.run(
+        'INSERT INTO usuarios (nombre, email, rol) VALUES (?, ?, ?)',
+        [nombre.trim(), email.toLowerCase(), rol || 'cliente'],
+        function (err) {
+
+          if (err) {
+            return res.status(500).json({
+              success: false,
+              message: err.message
+            });
+          }
+
+          res.status(201).json({
+            success: true,
+            message: 'Usuario registrado correctamente',
+            data: {
+              id: this.lastID,
+              nombre: nombre.trim(),
+              email: email.toLowerCase(),
+              rol: rol || 'cliente',
+              activo: 1
+            }
+          });
+
+        }
+      );
+
+    }
+  );
+
 });
 
-// PUT /usuarios/:id
+
+// ═══════════════════════════════════════
+// PUT /usuarios/:id — Actualizar usuario
+// ═══════════════════════════════════════
 router.put('/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const index = usuarios.findIndex(u => u.id === id);
 
-  if (index === -1) {
-    return res.status(404).json({ success: false, message: `Usuario con id ${id} no encontrado` });
-  }
-
+  const { id } = req.params;
   const { nombre, email, rol, activo } = req.body;
 
-  if (nombre !== undefined) usuarios[index].nombre = nombre;
-  if (email  !== undefined) usuarios[index].email  = email;
-  if (rol    !== undefined) usuarios[index].rol    = rol;
-  if (activo !== undefined) usuarios[index].activo = activo;
+  db.get(
+    'SELECT * FROM usuarios WHERE id = ?',
+    [id],
+    (err, row) => {
 
-  res.json({ success: true, message: 'Usuario actualizado correctamente', data: usuarios[index] });
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: err.message
+        });
+      }
+
+      if (!row) {
+        return res.status(404).json({
+          success: false,
+          message: `Usuario con id ${id} no encontrado`
+        });
+      }
+
+      const rolesValidos = ['admin', 'cliente', 'vendedor'];
+
+      if (rol && !rolesValidos.includes(rol)) {
+        return res.status(400).json({
+          success: false,
+          message: `rol debe ser uno de: ${rolesValidos.join(', ')}`
+        });
+      }
+
+      if (email) {
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        if (!emailRegex.test(email)) {
+          return res.status(400).json({
+            success: false,
+            message: 'El formato del email no es válido'
+          });
+        }
+
+      }
+
+      const nuevoNombre = nombre !== undefined ? nombre.trim() : row.nombre;
+      const nuevoEmail = email !== undefined ? email.toLowerCase() : row.email;
+      const nuevoRol = rol !== undefined ? rol : row.rol;
+      const nuevoActivo = activo !== undefined ? (activo ? 1 : 0) : row.activo;
+
+      db.run(
+        'UPDATE usuarios SET nombre = ?, email = ?, rol = ?, activo = ? WHERE id = ?',
+        [nuevoNombre, nuevoEmail, nuevoRol, nuevoActivo, id],
+        function (err) {
+
+          if (err) {
+            return res.status(500).json({
+              success: false,
+              message: err.message
+            });
+          }
+
+          res.json({
+            success: true,
+            message: 'Usuario actualizado correctamente',
+            data: {
+              id: parseInt(id),
+              nombre: nuevoNombre,
+              email: nuevoEmail,
+              rol: nuevoRol,
+              activo: nuevoActivo
+            }
+          });
+
+        }
+      );
+
+    }
+  );
+
 });
 
+
+// ═══════════════════════════════════════
 // DELETE /usuarios/:id
+// ═══════════════════════════════════════
 router.delete('/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const index = usuarios.findIndex(u => u.id === id);
 
-  if (index === -1) {
-    return res.status(404).json({ success: false, message: `Usuario con id ${id} no encontrado` });
-  }
+  const { id } = req.params;
 
-  const eliminado = usuarios.splice(index, 1)[0];
-  res.json({ success: true, message: 'Usuario eliminado correctamente', data: eliminado });
+  db.get(
+    'SELECT * FROM usuarios WHERE id = ?',
+    [id],
+    (err, row) => {
+
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: err.message
+        });
+      }
+
+      if (!row) {
+        return res.status(404).json({
+          success: false,
+          message: `Usuario con id ${id} no encontrado`
+        });
+      }
+
+      db.run(
+        'DELETE FROM usuarios WHERE id = ?',
+        [id],
+        (err) => {
+
+          if (err) {
+            return res.status(500).json({
+              success: false,
+              message: err.message
+            });
+          }
+
+          res.json({
+            success: true,
+            message: 'Usuario eliminado correctamente',
+            data: row
+          });
+
+        }
+      );
+
+    }
+  );
+
 });
 
 module.exports = router;

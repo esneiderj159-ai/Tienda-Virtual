@@ -1,110 +1,273 @@
 const express = require('express');
 const router = express.Router();
+const db = require('../db');
 
-// Base de datos en memoria
-let productos = [
-  { id: 1, nombre: 'Laptop HP 15"', precio: 2500000, categoria: 'tecnologia', stock: 10, activo: true },
-  { id: 2, nombre: 'Camisa Polo Azul', precio: 75000, categoria: 'ropa', stock: 50, activo: true },
-  { id: 3, nombre: 'Auriculares Bluetooth', precio: 180000, categoria: 'tecnologia', stock: 25, activo: true },
-  { id: 4, nombre: 'Silla Ergonómica', precio: 450000, categoria: 'muebles', stock: 8, activo: false },
-];
-let nextId = 5;
-
-// GET /productos - Obtener todos (con filtro dinámico por query params)
-// Ejemplo: GET /productos?nombre=laptop&categoria=tecnologia
+// ══════════════════════════════════════════
+// GET /productos — Listar todos
+// Filtros: ?nombre=  ?categoriaId=  ?activo=
+// Lee header: Authorization
+// ══════════════════════════════════════════
 router.get('/', (req, res) => {
-  // Leer header de autorización (requisito de headers)
   const token = req.headers['authorization'] || 'No proporcionado';
-  const filtros = req.query;
+  const { nombre, categoriaId, activo } = req.query;
 
-  let data = [...productos];
+  let sql = `
+    SELECT p.*, c.nombre AS categoriaNombre
+    FROM productos p
+    LEFT JOIN categorias c ON p.categoriaId = c.id
+    WHERE 1=1
+  `;
 
-  // Filtro dinámico por cualquier campo
-  if (Object.keys(filtros).length > 0) {
-    data = data.filter(p =>
-      Object.entries(filtros).every(([k, v]) =>
-        p[k] !== undefined &&
-        p[k].toString().toLowerCase().includes(v.toLowerCase())
-      )
-    );
+  const params = [];
+
+  if (nombre) {
+    sql += ' AND p.nombre LIKE ?';
+    params.push(`%${nombre}%`);
   }
 
-  res.json({
-    success: true,
-    total: data.length,
-    filtros_aplicados: filtros,
-    autorization_header: token,
-    data
+  if (categoriaId) {
+    sql += ' AND p.categoriaId = ?';
+    params.push(categoriaId);
+  }
+
+  if (activo !== undefined) {
+    sql += ' AND p.activo = ?';
+    params.push(activo === 'true' ? 1 : 0);
+  }
+
+  db.all(sql, params, (err, rows) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+
+    res.json({
+      success: true,
+      total: rows.length,
+      authorization_header: token,
+      data: rows
+    });
   });
 });
 
-// GET /productos/:id - Obtener producto por ID
+
+// ══════════════════════════════════════════
+// GET /productos/:id
+// ══════════════════════════════════════════
 router.get('/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const producto = productos.find(p => p.id === id);
+  const { id } = req.params;
 
-  if (!producto) {
-    return res.status(404).json({ success: false, message: `Producto con id ${id} no encontrado` });
-  }
+  db.get(
+    `
+    SELECT p.*, c.nombre AS categoriaNombre
+    FROM productos p
+    LEFT JOIN categorias c ON p.categoriaId = c.id
+    WHERE p.id = ?
+    `,
+    [id],
+    (err, row) => {
+      if (err) {
+        return res.status(500).json({ success: false, message: err.message });
+      }
 
-  res.json({ success: true, data: producto });
+      if (!row) {
+        return res.status(404).json({
+          success: false,
+          message: `Producto con id ${id} no encontrado`
+        });
+      }
+
+      res.json({ success: true, data: row });
+    }
+  );
 });
 
-// POST /productos - Crear nuevo producto
-router.post('/', (req, res) => {
-  const { nombre, precio, categoria, stock } = req.body;
 
-  if (!nombre || precio === undefined || !categoria) {
+// ══════════════════════════════════════════
+// POST /productos — Crear producto
+// ══════════════════════════════════════════
+router.post('/', (req, res) => {
+  const { nombre, precio, categoriaId, stock } = req.body;
+
+  if (!nombre || precio === undefined || !categoriaId) {
     return res.status(400).json({
       success: false,
-      message: 'Faltan campos obligatorios: nombre, precio, categoria'
+      message: 'Los campos nombre, precio y categoriaId son obligatorios'
     });
   }
 
-  const nuevo = {
-    id: nextId++,
-    nombre,
-    precio,
-    categoria,
-    stock: stock ?? 0,
-    activo: true
-  };
+  if (nombre.trim() === '') {
+    return res.status(400).json({
+      success: false,
+      message: 'El nombre no puede estar vacío'
+    });
+  }
 
-  productos.push(nuevo);
-  res.status(201).json({ success: true, message: 'Producto creado correctamente', data: nuevo });
+  if (isNaN(precio) || Number(precio) <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'precio debe ser un número mayor a 0'
+    });
+  }
+
+  if (stock !== undefined && (!Number.isInteger(Number(stock)) || Number(stock) < 0)) {
+    return res.status(400).json({
+      success: false,
+      message: 'stock debe ser un número entero mayor o igual a 0'
+    });
+  }
+
+  db.get(
+    'SELECT id FROM categorias WHERE id = ?',
+    [categoriaId],
+    (err, cat) => {
+
+      if (err) {
+        return res.status(500).json({ success: false, message: err.message });
+      }
+
+      if (!cat) {
+        return res.status(400).json({
+          success: false,
+          message: `La categoría con id ${categoriaId} no existe`
+        });
+      }
+
+      db.run(
+        `
+        INSERT INTO productos (nombre, precio, categoriaId, stock)
+        VALUES (?, ?, ?, ?)
+        `,
+        [nombre.trim(), Number(precio), Number(categoriaId), Number(stock) || 0],
+        function (err) {
+
+          if (err) {
+            return res.status(500).json({ success: false, message: err.message });
+          }
+
+          res.status(201).json({
+            success: true,
+            message: 'Producto creado correctamente',
+            data: {
+              id: this.lastID,
+              nombre: nombre.trim(),
+              precio: Number(precio),
+              categoriaId: Number(categoriaId),
+              stock: Number(stock) || 0,
+              activo: 1
+            }
+          });
+        }
+      );
+    }
+  );
 });
 
-// PUT /productos/:id - Actualizar producto
+
+// ══════════════════════════════════════════
+// PUT /productos/:id — Actualizar producto
+// ══════════════════════════════════════════
 router.put('/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const index = productos.findIndex(p => p.id === id);
 
-  if (index === -1) {
-    return res.status(404).json({ success: false, message: `Producto con id ${id} no encontrado` });
-  }
+  const { id } = req.params;
+  const { nombre, precio, categoriaId, stock, activo } = req.body;
 
-  const { nombre, precio, categoria, stock, activo } = req.body;
+  db.get('SELECT * FROM productos WHERE id = ?', [id], (err, row) => {
 
-  if (nombre !== undefined)    productos[index].nombre    = nombre;
-  if (precio !== undefined)    productos[index].precio    = precio;
-  if (categoria !== undefined) productos[index].categoria = categoria;
-  if (stock !== undefined)     productos[index].stock     = stock;
-  if (activo !== undefined)    productos[index].activo    = activo;
+    if (err) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
 
-  res.json({ success: true, message: 'Producto actualizado correctamente', data: productos[index] });
+    if (!row) {
+      return res.status(404).json({
+        success: false,
+        message: `Producto con id ${id} no encontrado`
+      });
+    }
+
+    if (precio !== undefined && (isNaN(precio) || Number(precio) <= 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'precio debe ser un número mayor a 0'
+      });
+    }
+
+    if (stock !== undefined && (!Number.isInteger(Number(stock)) || Number(stock) < 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'stock debe ser un número entero mayor o igual a 0'
+      });
+    }
+
+    const nuevoNombre = nombre !== undefined ? nombre.trim() : row.nombre;
+    const nuevoPrecio = precio !== undefined ? Number(precio) : row.precio;
+    const nuevoCategoriaId = categoriaId !== undefined ? Number(categoriaId) : row.categoriaId;
+    const nuevoStock = stock !== undefined ? Number(stock) : row.stock;
+    const nuevoActivo = activo !== undefined ? (activo ? 1 : 0) : row.activo;
+
+    db.run(
+      `
+      UPDATE productos
+      SET nombre = ?, precio = ?, categoriaId = ?, stock = ?, activo = ?
+      WHERE id = ?
+      `,
+      [nuevoNombre, nuevoPrecio, nuevoCategoriaId, nuevoStock, nuevoActivo, id],
+      function (err) {
+
+        if (err) {
+          return res.status(500).json({ success: false, message: err.message });
+        }
+
+        res.json({
+          success: true,
+          message: 'Producto actualizado correctamente',
+          data: {
+            id: parseInt(id),
+            nombre: nuevoNombre,
+            precio: nuevoPrecio,
+            categoriaId: nuevoCategoriaId,
+            stock: nuevoStock,
+            activo: nuevoActivo
+          }
+        });
+      }
+    );
+  });
 });
 
-// DELETE /productos/:id - Eliminar producto
+
+// ══════════════════════════════════════════
+// DELETE /productos/:id
+// ══════════════════════════════════════════
 router.delete('/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const index = productos.findIndex(p => p.id === id);
 
-  if (index === -1) {
-    return res.status(404).json({ success: false, message: `Producto con id ${id} no encontrado` });
-  }
+  const { id } = req.params;
 
-  const eliminado = productos.splice(index, 1)[0];
-  res.json({ success: true, message: 'Producto eliminado correctamente', data: eliminado });
+  db.get('SELECT * FROM productos WHERE id = ?', [id], (err, row) => {
+
+    if (err) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+
+    if (!row) {
+      return res.status(404).json({
+        success: false,
+        message: `Producto con id ${id} no encontrado`
+      });
+    }
+
+    db.run('DELETE FROM productos WHERE id = ?', [id], (err) => {
+
+      if (err) {
+        return res.status(500).json({ success: false, message: err.message });
+      }
+
+      res.json({
+        success: true,
+        message: 'Producto eliminado correctamente',
+        data: row
+      });
+    });
+  });
 });
 
 module.exports = router;

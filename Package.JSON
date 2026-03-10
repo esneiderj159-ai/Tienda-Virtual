@@ -1,15 +1,16 @@
 {
-  "name": "tienda-virtual",
-  "version": "1.0.0",
-  "description": "",
+  "name": "tienda-virtual-api",
+  "version": "2.0.0",
+  "description": "API REST Tienda Virtual con SQLite - SENA Guía 2",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "express": "^5.2.1"
+    "express": "^4.22.1",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
   }
 }

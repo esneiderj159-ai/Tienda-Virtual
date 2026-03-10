@@ -1,100 +1,283 @@
 const express = require('express');
 const router = express.Router();
+const db = require('../db'); // Conexión SQLite
 
-// Base de datos en memoria
-let categorias = [
-  { id: 1, nombre: 'Tecnología',  descripcion: 'Dispositivos electrónicos y accesorios', activa: true },
-  { id: 2, nombre: 'Ropa',        descripcion: 'Prendas de vestir para toda ocasión',    activa: true },
-  { id: 3, nombre: 'Muebles',     descripcion: 'Mobiliario para hogar y oficina',         activa: true },
-  { id: 4, nombre: 'Deportes',    descripcion: 'Artículos deportivos y fitness',          activa: false },
-];
-let nextId = 5;
-
-// GET /categorias - Obtener todas (con filtro dinámico por query params)
-// Ejemplo: GET /categorias?nombre=ropa  |  GET /categorias?activa=true
+// ═══════════════════════════════════════
+// GET /categorias — Listar todas
+// Filtros: ?nombre=  ?activa=
+// Header: Accept-Language
+// ═══════════════════════════════════════
 router.get('/', (req, res) => {
-  const idioma = req.headers['accept-language'] || 'No proporcionado';
-  const filtros = req.query;
-  let data = [...categorias];
 
-  if (Object.keys(filtros).length > 0) {
-    data = data.filter(c =>
-      Object.entries(filtros).every(([k, v]) =>
-        c[k] !== undefined &&
-        c[k].toString().toLowerCase().includes(v.toLowerCase())
-      )
-    );
+  const idioma = req.headers['accept-language'] || 'No proporcionado';
+  const { nombre, activa } = req.query;
+
+  let sql = 'SELECT * FROM categorias WHERE 1=1';
+  const params = [];
+
+  if (nombre) {
+    sql += ' AND nombre LIKE ?';
+    params.push(`%${nombre}%`);
   }
 
-  res.json({
-    success: true,
-    total: data.length,
-    filtros_aplicados: filtros,
-    idioma_header: idioma,
-    data
+  if (activa !== undefined) {
+    sql += ' AND activa = ?';
+    params.push(activa === 'true' ? 1 : 0);
+  }
+
+  db.all(sql, params, (err, rows) => {
+
+    if (err) {
+      return res.status(500).json({
+        success: false,
+        message: err.message
+      });
+    }
+
+    res.json({
+      success: true,
+      total: rows.length,
+      idioma_header: idioma,
+      data: rows
+    });
+
   });
 });
 
+
+// ═══════════════════════════════════════
 // GET /categorias/:id
+// ═══════════════════════════════════════
 router.get('/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const categoria = categorias.find(c => c.id === id);
 
-  if (!categoria) {
-    return res.status(404).json({ success: false, message: `Categoría con id ${id} no encontrada` });
-  }
+  const { id } = req.params;
 
-  res.json({ success: true, data: categoria });
+  db.get(
+    'SELECT * FROM categorias WHERE id = ?',
+    [id],
+    (err, row) => {
+
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: err.message
+        });
+      }
+
+      if (!row) {
+        return res.status(404).json({
+          success: false,
+          message: `Categoría con id ${id} no encontrada`
+        });
+      }
+
+      res.json({
+        success: true,
+        data: row
+      });
+
+    }
+  );
 });
 
-// POST /categorias
+
+// ═══════════════════════════════════════
+// POST /categorias — Crear categoría
+// ═══════════════════════════════════════
 router.post('/', (req, res) => {
+
   const { nombre, descripcion } = req.body;
 
-  if (!nombre) {
-    return res.status(400).json({ success: false, message: 'El campo nombre es obligatorio' });
+  // Validar nombre obligatorio
+  if (!nombre || nombre.trim() === '') {
+    return res.status(400).json({
+      success: false,
+      message: 'El campo nombre es obligatorio'
+    });
   }
 
-  const nueva = {
-    id: nextId++,
-    nombre,
-    descripcion: descripcion || '',
-    activa: true
-  };
+  // Validar longitud mínima
+  if (nombre.trim().length < 2) {
+    return res.status(400).json({
+      success: false,
+      message: 'El nombre debe tener al menos 2 caracteres'
+    });
+  }
 
-  categorias.push(nueva);
-  res.status(201).json({ success: true, message: 'Categoría creada correctamente', data: nueva });
+  // Verificar unicidad
+  db.get(
+    'SELECT id FROM categorias WHERE nombre = ?',
+    [nombre.trim()],
+    (err, row) => {
+
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: err.message
+        });
+      }
+
+      if (row) {
+        return res.status(400).json({
+          success: false,
+          message: `Ya existe una categoría con el nombre "${nombre}"`
+        });
+      }
+
+      // Insertar categoría
+      db.run(
+        'INSERT INTO categorias (nombre, descripcion) VALUES (?, ?)',
+        [nombre.trim(), descripcion || ''],
+        function (err) {
+
+          if (err) {
+            return res.status(500).json({
+              success: false,
+              message: err.message
+            });
+          }
+
+          res.status(201).json({
+            success: true,
+            message: 'Categoría creada correctamente',
+            data: {
+              id: this.lastID,
+              nombre: nombre.trim(),
+              descripcion: descripcion || '',
+              activa: 1
+            }
+          });
+
+        }
+      );
+    }
+  );
 });
 
-// PUT /categorias/:id
+
+// ═══════════════════════════════════════
+// PUT /categorias/:id — Actualizar
+// ═══════════════════════════════════════
 router.put('/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const index = categorias.findIndex(c => c.id === id);
 
-  if (index === -1) {
-    return res.status(404).json({ success: false, message: `Categoría con id ${id} no encontrada` });
-  }
-
+  const { id } = req.params;
   const { nombre, descripcion, activa } = req.body;
 
-  if (nombre !== undefined)      categorias[index].nombre      = nombre;
-  if (descripcion !== undefined) categorias[index].descripcion = descripcion;
-  if (activa !== undefined)      categorias[index].activa      = activa;
+  db.get(
+    'SELECT * FROM categorias WHERE id = ?',
+    [id],
+    (err, row) => {
 
-  res.json({ success: true, message: 'Categoría actualizada correctamente', data: categorias[index] });
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: err.message
+        });
+      }
+
+      if (!row) {
+        return res.status(404).json({
+          success: false,
+          message: `Categoría con id ${id} no encontrada`
+        });
+      }
+
+      if (
+        activa !== undefined &&
+        activa !== true &&
+        activa !== false &&
+        activa !== 1 &&
+        activa !== 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'activa debe ser true o false'
+        });
+      }
+
+      const nuevoNombre = nombre !== undefined ? nombre.trim() : row.nombre;
+      const nuevaDescripcion = descripcion !== undefined ? descripcion : row.descripcion;
+      const nuevaActiva = activa !== undefined ? (activa ? 1 : 0) : row.activa;
+
+      db.run(
+        'UPDATE categorias SET nombre = ?, descripcion = ?, activa = ? WHERE id = ?',
+        [nuevoNombre, nuevaDescripcion, nuevaActiva, id],
+        function (err) {
+
+          if (err) {
+            return res.status(500).json({
+              success: false,
+              message: err.message
+            });
+          }
+
+          res.json({
+            success: true,
+            message: 'Categoría actualizada correctamente',
+            data: {
+              id: parseInt(id),
+              nombre: nuevoNombre,
+              descripcion: nuevaDescripcion,
+              activa: nuevaActiva
+            }
+          });
+
+        }
+      );
+    }
+  );
 });
 
+
+// ═══════════════════════════════════════
 // DELETE /categorias/:id
+// ═══════════════════════════════════════
 router.delete('/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const index = categorias.findIndex(c => c.id === id);
 
-  if (index === -1) {
-    return res.status(404).json({ success: false, message: `Categoría con id ${id} no encontrada` });
-  }
+  const { id } = req.params;
 
-  const eliminada = categorias.splice(index, 1)[0];
-  res.json({ success: true, message: 'Categoría eliminada correctamente', data: eliminada });
+  db.get(
+    'SELECT * FROM categorias WHERE id = ?',
+    [id],
+    (err, row) => {
+
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          message: err.message
+        });
+      }
+
+      if (!row) {
+        return res.status(404).json({
+          success: false,
+          message: `Categoría con id ${id} no encontrada`
+        });
+      }
+
+      db.run(
+        'DELETE FROM categorias WHERE id = ?',
+        [id],
+        (err) => {
+
+          if (err) {
+            return res.status(500).json({
+              success: false,
+              message: err.message
+            });
+          }
+
+          res.json({
+            success: true,
+            message: 'Categoría eliminada correctamente',
+            data: row
+          });
+
+        }
+      );
+
+    }
+  );
 });
 
 module.exports = router;
