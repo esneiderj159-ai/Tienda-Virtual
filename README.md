@@ -1,23 +1,24 @@
-# 🛒 API REST – Tienda Virtual | SENA
+# 🛒 API REST – Tienda Virtual | SENA Guía 2
 
-> **Actividad:** Desarrollo de APIs REST con Node.js  
+> **Actividad:** Modelo de Base de Datos y Validaciones  
 > **Programa:** Tecnología en Análisis y Desarrollo de Software  
 > **Instructor:** Mateo  
-> **Proyecto elegido:** Proyecto 1 – Tienda Virtual
+> **Proyecto:** Proyecto 1 – Tienda Virtual  
+> **Integrantes:** Angel Gabriel Villada Jiménez y Erick Sneider Jiménez López  
+> **Ficha:** 3229209
 
 ---
 
-##  Integrantes del Grupo
+## 🛠️ Tecnologías Utilizadas
 
-| Integrante | Rol |
-|-----------|-----|
-| _________________________ | Tech Lead |
-| _________________________ | Backend Developer |
-| _________________________ | QA / Documentador |
+- **Node.js** v18+
+- **Express.js** v4.22+
+- **SQLite3** v5.1+ (base de datos persistente en archivo local)
+- **Postman** para pruebas de endpoints
 
 ---
 
-##  Instalación y Ejecución
+## 🚀 Instalación y Ejecución
 
 ```bash
 # 1. Clonar el repositorio
@@ -30,157 +31,210 @@ npm install
 # 3. Ejecutar el servidor
 npm start
 # El servidor corre en http://localhost:3000
+# La base de datos database.db se crea automáticamente
 ```
 
 ---
 
-##  Estructura del Proyecto
+## 📁 Estructura del Proyecto
 
 ```
 tienda-virtual/
 ├── index.js          ← Servidor principal y registro de rutas
+├── db.js             ← Conexión SQLite y creación de tablas
+├── database.db       ← Archivo SQLite (generado automáticamente)
 ├── package.json
+├── .gitignore
 └── routes/
-    ├── productos.js   ← API Productos
-    ├── categorias.js  ← API Categorías
-    ├── usuarios.js    ← API Usuarios
-    └── pedidos.js     ← API Pedidos
+    ├── productos.js  ← API Productos
+    ├── categorias.js ← API Categorías
+    ├── usuarios.js   ← API Usuarios
+    └── pedidos.js    ← API Pedidos
 ```
 
 ---
 
-##  Endpoints
+## 🗄️ Modelo de Base de Datos
 
-###  API 1 – Productos `/productos`
+### Diagrama Entidad-Relación
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/productos` | Listar todos los productos (soporta filtros por query) |
-| GET | `/productos/:id` | Obtener un producto por ID |
-| POST | `/productos` | Crear un nuevo producto |
-| PUT | `/productos/:id` | Actualizar un producto existente |
-| DELETE | `/productos/:id` | Eliminar un producto |
-
-**Campos:** `id`, `nombre`, `precio`, `categoria`, `stock`, `activo`
-
-**Ejemplos de uso:**
 ```
-GET  /productos
-GET  /productos?categoria=tecnologia
-GET  /productos?nombre=laptop
-GET  /productos/1
-POST /productos        Body: { "nombre": "Mouse", "precio": 50000, "categoria": "tecnologia", "stock": 30 }
-PUT  /productos/1      Body: { "precio": 2400000, "stock": 8 }
-DEL  /productos/1
+categorias (PK: id)
+      |
+      | 1:N
+      |
+productos (PK: id, FK: categoriaId → categorias.id)
+      |
+      | N:M (a través de pedido_productos)
+      |
+pedidos (PK: id, FK: usuarioId → usuarios.id)
+      |
+      | 1:N
+      |
+usuarios (PK: id)
 ```
-**Header requerido:** `Authorization: Bearer <token>`
+
+### Relaciones
+- Una **categoría** tiene muchos **productos** (1:N)
+- Un **usuario** tiene muchos **pedidos** (1:N)
+- Un **pedido** puede tener muchos **productos** y un **producto** puede estar en muchos **pedidos** (N:M → tabla intermedia `pedido_productos`)
 
 ---
 
-###  API 2 – Categorías `/categorias`
+## 📋 Diccionario de Datos
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/categorias` | Listar todas las categorías (soporta filtros) |
-| GET | `/categorias/:id` | Obtener una categoría por ID |
-| POST | `/categorias` | Crear una nueva categoría |
-| PUT | `/categorias/:id` | Actualizar una categoría |
-| DELETE | `/categorias/:id` | Eliminar una categoría |
+### Tabla: `categorias`
+| Campo | Tipo | PK | FK | Restricción | Descripción |
+|-------|------|----|----|-------------|-------------|
+| id | INTEGER | ✅ | ❌ | AUTOINCREMENT | Identificador único |
+| nombre | TEXT | ❌ | ❌ | NOT NULL, UNIQUE | Nombre de la categoría |
+| descripcion | TEXT | ❌ | ❌ | DEFAULT '' | Descripción opcional |
+| activa | INTEGER | ❌ | ❌ | DEFAULT 1, CHECK(0,1) | 1=activa, 0=inactiva |
 
-**Campos:** `id`, `nombre`, `descripcion`, `activa`
+### Tabla: `usuarios`
+| Campo | Tipo | PK | FK | Restricción | Descripción |
+|-------|------|----|----|-------------|-------------|
+| id | INTEGER | ✅ | ❌ | AUTOINCREMENT | Identificador único |
+| nombre | TEXT | ❌ | ❌ | NOT NULL | Nombre completo |
+| email | TEXT | ❌ | ❌ | NOT NULL, UNIQUE | Correo electrónico |
+| rol | TEXT | ❌ | ❌ | CHECK(admin,cliente,vendedor) | Rol del usuario |
+| activo | INTEGER | ❌ | ❌ | DEFAULT 1, CHECK(0,1) | 1=activo, 0=inactivo |
 
-**Ejemplos de uso:**
-```
-GET  /categorias
-GET  /categorias?activa=true
-GET  /categorias?nombre=ropa
-GET  /categorias/2
-POST /categorias        Body: { "nombre": "Hogar", "descripcion": "Artículos para el hogar" }
-PUT  /categorias/2      Body: { "activa": false }
-DEL  /categorias/2
-```
-**Header leído:** `Accept-Language`
+### Tabla: `productos`
+| Campo | Tipo | PK | FK | Restricción | Descripción |
+|-------|------|----|----|-------------|-------------|
+| id | INTEGER | ✅ | ❌ | AUTOINCREMENT | Identificador único |
+| nombre | TEXT | ❌ | ❌ | NOT NULL | Nombre del producto |
+| precio | REAL | ❌ | ❌ | NOT NULL, CHECK(>0) | Precio de venta |
+| categoriaId | INTEGER | ❌ | ✅ | FK → categorias.id | Categoría del producto |
+| stock | INTEGER | ❌ | ❌ | DEFAULT 0, CHECK(>=0) | Unidades disponibles |
+| activo | INTEGER | ❌ | ❌ | DEFAULT 1, CHECK(0,1) | 1=activo, 0=inactivo |
+
+### Tabla: `pedidos`
+| Campo | Tipo | PK | FK | Restricción | Descripción |
+|-------|------|----|----|-------------|-------------|
+| id | INTEGER | ✅ | ❌ | AUTOINCREMENT | Identificador único |
+| usuarioId | INTEGER | ❌ | ✅ | FK → usuarios.id | Usuario que hizo el pedido |
+| total | REAL | ❌ | ❌ | DEFAULT 0, CHECK(>=0) | Total calculado automáticamente |
+| estado | TEXT | ❌ | ❌ | CHECK(pendiente,procesando,enviado,entregado,cancelado) | Estado del pedido |
+| fecha | TEXT | ❌ | ❌ | DEFAULT date('now') | Fecha de creación automática |
+
+### Tabla: `pedido_productos` (intermedia N:M)
+| Campo | Tipo | PK | FK | Restricción | Descripción |
+|-------|------|----|----|-------------|-------------|
+| id | INTEGER | ✅ | ❌ | AUTOINCREMENT | Identificador único |
+| pedidoId | INTEGER | ❌ | ✅ | FK → pedidos.id | Pedido al que pertenece |
+| productoId | INTEGER | ❌ | ✅ | FK → productos.id | Producto incluido |
+| cantidad | INTEGER | ❌ | ❌ | NOT NULL, CHECK(>0) | Cantidad pedida |
+| precioUnit | REAL | ❌ | ❌ | NOT NULL, CHECK(>0) | Precio unitario al comprar |
 
 ---
 
-###  API 3 – Usuarios `/usuarios`
+## 📌 Endpoints
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/usuarios` | Listar todos los usuarios (soporta filtros) |
-| GET | `/usuarios/:id` | Obtener un usuario por ID |
-| POST | `/usuarios` | Registrar un nuevo usuario |
-| PUT | `/usuarios/:id` | Actualizar datos de un usuario |
-| DELETE | `/usuarios/:id` | Eliminar un usuario |
+### 🛍️ API 1 – Productos `/productos`
 
-**Campos:** `id`, `nombre`, `email`, `rol`, `activo`
+| Método | Ruta | Descripción | Código |
+|--------|------|-------------|--------|
+| GET | `/productos` | Listar todos (filtros: ?nombre= ?categoriaId= ?activo=) | 200 |
+| GET | `/productos/:id` | Obtener por ID | 200 / 404 |
+| POST | `/productos` | Crear producto | 201 / 400 |
+| PUT | `/productos/:id` | Actualizar producto | 200 / 404 |
+| DELETE | `/productos/:id` | Eliminar producto | 200 / 404 |
 
-**Ejemplos de uso:**
-```
-GET  /usuarios
-GET  /usuarios?rol=admin
-GET  /usuarios?activo=true
-GET  /usuarios/1
-POST /usuarios        Body: { "nombre": "Juan Pérez", "email": "juan@email.com", "rol": "cliente" }
-PUT  /usuarios/1      Body: { "rol": "vendedor" }
-DEL  /usuarios/1
-```
 **Header leído:** `Authorization`
 
+**Validaciones POST:**
+- `nombre`, `precio`, `categoriaId` son obligatorios
+- `precio` debe ser número mayor a 0
+- `stock` debe ser entero mayor o igual a 0
+- `categoriaId` debe existir en la base de datos
+
 ---
 
-### API 4 – Pedidos `/pedidos`
+### 🏷️ API 2 – Categorías `/categorias`
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/pedidos` | Listar todos los pedidos (soporta filtros) |
-| GET | `/pedidos/:id` | Obtener un pedido por ID |
-| POST | `/pedidos` | Crear un nuevo pedido |
-| PUT | `/pedidos/:id` | Actualizar estado de un pedido |
-| DELETE | `/pedidos/:id` | Cancelar/eliminar un pedido |
+| Método | Ruta | Descripción | Código |
+|--------|------|-------------|--------|
+| GET | `/categorias` | Listar todas (filtros: ?nombre= ?activa=) | 200 |
+| GET | `/categorias/:id` | Obtener por ID | 200 / 404 |
+| POST | `/categorias` | Crear categoría | 201 / 400 |
+| PUT | `/categorias/:id` | Actualizar categoría | 200 / 404 |
+| DELETE | `/categorias/:id` | Eliminar categoría | 200 / 404 |
 
-**Campos:** `id`, `usuarioId`, `productos`, `total`, `estado`, `fecha`  
-**Estados válidos:** `pendiente`, `procesando`, `enviado`, `entregado`, `cancelado`
+**Header leído:** `Accept-Language`
 
-**Ejemplos de uso:**
-```
-GET  /pedidos
-GET  /pedidos?estado=pendiente
-GET  /pedidos?usuarioId=2
-GET  /pedidos/1
-POST /pedidos   Body: {
-                  "usuarioId": 2,
-                  "productos": [
-                    { "productoId": 1, "nombre": "Laptop", "cantidad": 1, "precioUnit": 2500000 }
-                  ]
-                }
-PUT  /pedidos/1      Body: { "estado": "enviado" }
-DEL  /pedidos/1
-```
+**Validaciones POST:**
+- `nombre` es obligatorio y mínimo 2 caracteres
+- `nombre` debe ser único (no puede repetirse)
+
+---
+
+### 👤 API 3 – Usuarios `/usuarios`
+
+| Método | Ruta | Descripción | Código |
+|--------|------|-------------|--------|
+| GET | `/usuarios` | Listar todos (filtros: ?nombre= ?rol= ?activo=) | 200 |
+| GET | `/usuarios/:id` | Obtener por ID | 200 / 404 |
+| POST | `/usuarios` | Registrar usuario | 201 / 400 |
+| PUT | `/usuarios/:id` | Actualizar usuario | 200 / 404 |
+| DELETE | `/usuarios/:id` | Eliminar usuario | 200 / 404 |
+
+**Header leído:** `Authorization`
+
+**Validaciones POST:**
+- `nombre` y `email` son obligatorios
+- `email` debe tener formato válido (usuario@dominio.com)
+- `email` debe ser único (no puede repetirse)
+- `rol` debe ser: `admin`, `cliente` o `vendedor`
+
+---
+
+### 📦 API 4 – Pedidos `/pedidos`
+
+| Método | Ruta | Descripción | Código |
+|--------|------|-------------|--------|
+| GET | `/pedidos` | Listar todos (filtros: ?estado= ?usuarioId=) | 200 |
+| GET | `/pedidos/:id` | Obtener por ID | 200 / 404 |
+| POST | `/pedidos` | Crear pedido | 201 / 400 |
+| PUT | `/pedidos/:id` | Actualizar estado | 200 / 400 / 404 |
+| DELETE | `/pedidos/:id` | Eliminar pedido | 200 / 404 |
+
 **Headers leídos:** `Authorization`, `X-App-Source`
 
+**Validaciones POST:**
+- `usuarioId` es obligatorio y debe existir en la base de datos
+- `productos` debe ser un array con al menos 1 item
+- Cada producto debe tener `productoId`, `cantidad` y `precioUnit`
+- `cantidad` debe ser entero mayor a 0
+- `precioUnit` debe ser número mayor a 0
+- `total` se calcula automáticamente
+
+**Estados válidos:** `pendiente`, `procesando`, `enviado`, `entregado`, `cancelado`
+
 ---
 
-##  Formato de Respuestas
+## 📋 Formato de Respuestas
 
-**Respuesta exitosa:**
+**Exitosa (201 Created):**
 ```json
 {
   "success": true,
-  "data": { ... }
+  "message": "Producto creado correctamente",
+  "data": { "id": 1, "nombre": "Laptop HP", "precio": 2500000 }
 }
 ```
 
-**Respuesta con lista:**
+**Exitosa con lista (200 OK):**
 ```json
 {
   "success": true,
-  "total": 4,
+  "total": 3,
   "data": [ ... ]
 }
 ```
 
-**Recurso no encontrado (404):**
+**No encontrado (404):**
 ```json
 {
   "success": false,
@@ -192,42 +246,27 @@ DEL  /pedidos/1
 ```json
 {
   "success": false,
-  "message": "Faltan campos obligatorios: nombre, precio, categoria"
+  "message": "precio debe ser un número mayor a 0"
 }
 ```
 
 ---
 
-##  Pruebas con Postman / Thunder Client
+## 🧪 Pruebas en Postman — Orden correcto
 
-Importa la colección o crea requests manualmente usando la URL base:  
-`http://localhost:3000`
+Insertar datos en este orden para respetar las llaves foráneas:
 
-**Ejemplo de request POST en Postman:**
-- Method: `POST`
-- URL: `http://localhost:3000/productos`
-- Headers: `Content-Type: application/json`, `Authorization: Bearer mitoken123`
-- Body (raw JSON):
-```json
-{
-  "nombre": "Teclado Mecánico",
-  "precio": 320000,
-  "categoria": "tecnologia",
-  "stock": 15
-}
+```
+1. POST /categorias   → crear categoría primero
+2. POST /usuarios     → crear usuario
+3. POST /productos    → crear producto (necesita categoriaId)
+4. POST /pedidos      → crear pedido (necesita usuarioId y productoId)
 ```
 
 ---
 
-##  Tecnologías Utilizadas
+## 📝 Notas
 
-- **Node.js** v18+
-- **Express.js** v4.18+
-- **Postman / Thunder Client** para pruebas
-
----
-
-##  Notas
-
-- Los datos se almacenan **en memoria** (se reinician al reiniciar el servidor).
-- Para producción se recomienda conectar una base de datos como MongoDB o PostgreSQL.
+- Los datos se almacenan en **SQLite** (`database.db`) y son **persistentes** — no se pierden al reiniciar el servidor.
+- El archivo `database.db` se genera automáticamente al iniciar el servidor por primera vez.
+- `database.db` y `node_modules/` están en `.gitignore` y no se suben a GitHub.
