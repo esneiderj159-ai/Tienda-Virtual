@@ -56,7 +56,9 @@ tienda-virtual/
 
 ## 🗄️ Modelo de Base de Datos
 
-### Diagrama Entidad-Relación
+## Diagrama Entidad-Relación
+
+![Diagrama ER](diagrama_er.png)
 
 ```
 categorias (PK: id)
