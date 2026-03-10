@@ -1,4 +1,4 @@
-# 🛒 API REST – Tienda Virtual | SENA Guía 2
+#  API REST – Tienda Virtual | SENA Guía 2
 
 > **Actividad:** Modelo de Base de Datos y Validaciones  
 > **Programa:** Tecnología en Análisis y Desarrollo de Software  
@@ -9,7 +9,7 @@
 
 ---
 
-## 🛠️ Tecnologías Utilizadas
+##  Tecnologías Utilizadas
 
 - **Node.js** v18+
 - **Express.js** v4.22+
@@ -18,7 +18,7 @@
 
 ---
 
-## 🚀 Instalación y Ejecución
+##  Instalación y Ejecución
 
 ```bash
 # 1. Clonar el repositorio
@@ -36,7 +36,7 @@ npm start
 
 ---
 
-## 📁 Estructura del Proyecto
+##  Estructura del Proyecto
 
 ```
 tienda-virtual/
@@ -54,7 +54,7 @@ tienda-virtual/
 
 ---
 
-## 🗄️ Modelo de Base de Datos
+##  Modelo de Base de Datos
 
 ## Diagrama Entidad-Relación
 
@@ -83,7 +83,7 @@ usuarios (PK: id)
 
 ---
 
-## 📋 Diccionario de Datos
+##  Diccionario de Datos
 
 ### Tabla: `categorias`
 | Campo | Tipo | PK | FK | Restricción | Descripción |
@@ -132,9 +132,9 @@ usuarios (PK: id)
 
 ---
 
-## 📌 Endpoints
+##  Endpoints
 
-### 🛍️ API 1 – Productos `/productos`
+###  API 1 – Productos `/productos`
 
 | Método | Ruta | Descripción | Código |
 |--------|------|-------------|--------|
@@ -154,7 +154,7 @@ usuarios (PK: id)
 
 ---
 
-### 🏷️ API 2 – Categorías `/categorias`
+###  API 2 – Categorías `/categorias`
 
 | Método | Ruta | Descripción | Código |
 |--------|------|-------------|--------|
@@ -172,7 +172,7 @@ usuarios (PK: id)
 
 ---
 
-### 👤 API 3 – Usuarios `/usuarios`
+###  API 3 – Usuarios `/usuarios`
 
 | Método | Ruta | Descripción | Código |
 |--------|------|-------------|--------|
@@ -192,7 +192,7 @@ usuarios (PK: id)
 
 ---
 
-### 📦 API 4 – Pedidos `/pedidos`
+###  API 4 – Pedidos `/pedidos`
 
 | Método | Ruta | Descripción | Código |
 |--------|------|-------------|--------|
@@ -216,7 +216,7 @@ usuarios (PK: id)
 
 ---
 
-## 📋 Formato de Respuestas
+##  Formato de Respuestas
 
 **Exitosa (201 Created):**
 ```json
@@ -254,7 +254,7 @@ usuarios (PK: id)
 
 ---
 
-## 🧪 Pruebas en Postman — Orden correcto
+##  Pruebas en Postman — Orden correcto
 
 Insertar datos en este orden para respetar las llaves foráneas:
 
@@ -267,7 +267,7 @@ Insertar datos en este orden para respetar las llaves foráneas:
 
 ---
 
-## 📝 Notas
+##  Notas
 
 - Los datos se almacenan en **SQLite** (`database.db`) y son **persistentes** — no se pierden al reiniciar el servidor.
 - El archivo `database.db` se genera automáticamente al iniciar el servidor por primera vez.
