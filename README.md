@@ -1,6 +1,6 @@
-#  API REST – Tienda Virtual | SENA Guía 2
+#  API REST – Tienda Virtual | SENA Guía 3
 
-> **Actividad:** Modelo de Base de Datos y Validaciones  
+> **Actividad:** Despliegue de API REST en Render  
 > **Programa:** Tecnología en Análisis y Desarrollo de Software  
 > **Instructor:** Mateo  
 > **Proyecto:** Proyecto 1 – Tienda Virtual  
@@ -9,30 +9,73 @@
 
 ---
 
+##  URL de la API en Producción
+
+```
+https://tienda-virtual-1-lvbf.onrender.com
+```
+
+> ⚠️ El plan gratuito de Render suspende el servidor tras 15 minutos de inactividad.
+> La primera petición puede tardar ~30 segundos (cold start). Espera y vuelve a intentar.
+
+---
+
+##  Autenticación
+
+Todos los endpoints requieren el siguiente header en cada petición:
+
+```
+password: MiPasswordSegura2024
+```
+
+Sin este header la API responde `401 Unauthorized`.  
+Con password incorrecta responde `403 Forbidden`.
+
+---
+
 ##  Tecnologías Utilizadas
 
 - **Node.js** v18+
 - **Express.js** v4.22+
-- **SQLite3** v5.1+ (base de datos persistente en archivo local)
-- **Postman** para pruebas de endpoints
+- **SQLite3** v5.1+
+- **dotenv** v16+
+- **Render.com** (plataforma de despliegue gratuita)
+- **Postman** para pruebas
 
 ---
 
-##  Instalación y Ejecución
+##  Instalación y Ejecución Local
 
 ```bash
 # 1. Clonar el repositorio
-git clone <URL_DEL_REPOSITORIO>
+git clone https://github.com/esneiderj159-ai/Tienda-Virtual
 cd tienda-virtual
 
 # 2. Instalar dependencias
 npm install
 
-# 3. Ejecutar el servidor
+# 3. Crear archivo .env en la raíz del proyecto
+# (ver sección Variables de Entorno abajo)
+
+# 4. Ejecutar el servidor
 npm start
-# El servidor corre en http://localhost:3000
-# La base de datos database.db se crea automáticamente
+# Corre en http://localhost:3000
 ```
+
+---
+
+##  Variables de Entorno
+
+Crear un archivo `.env` en la raíz del proyecto:
+
+```
+PORT=3000
+API_PASSWORD=MiPasswordSegura2024
+NODE_ENV=development
+```
+
+> ⚠️ El archivo `.env` NO se sube a GitHub. Está en el `.gitignore`.  
+> En Render estas variables se configuran en la sección **Environment**.
 
 ---
 
@@ -40,235 +83,105 @@ npm start
 
 ```
 tienda-virtual/
-├── index.js          ← Servidor principal y registro de rutas
+├── index.js          ← Servidor con middleware de autenticación
 ├── db.js             ← Conexión SQLite y creación de tablas
-├── database.db       ← Archivo SQLite (generado automáticamente)
-├── package.json
-├── .gitignore
+├── database.db       ← Archivo SQLite (se genera automáticamente)
+├── package.json      ← Dependencias y script start
+├── .env              ← Variables de entorno (NO se sube a GitHub)
+├── .gitignore        ← Excluye node_modules/, database.db y .env
 └── routes/
-    ├── productos.js  ← API Productos
-    ├── categorias.js ← API Categorías
-    ├── usuarios.js   ← API Usuarios
-    └── pedidos.js    ← API Pedidos
+    ├── productos.js
+    ├── categorias.js
+    ├── usuarios.js
+    └── pedidos.js
 ```
-
----
-
-##  Modelo de Base de Datos
-
-## Diagrama Entidad-Relación
-
-![Diagrama ER](diagrama_er.png)
-
-```
-categorias (PK: id)
-      |
-      | 1:N
-      |
-productos (PK: id, FK: categoriaId → categorias.id)
-      |
-      | N:M (a través de pedido_productos)
-      |
-pedidos (PK: id, FK: usuarioId → usuarios.id)
-      |
-      | 1:N
-      |
-usuarios (PK: id)
-```
-
-### Relaciones
-- Una **categoría** tiene muchos **productos** (1:N)
-- Un **usuario** tiene muchos **pedidos** (1:N)
-- Un **pedido** puede tener muchos **productos** y un **producto** puede estar en muchos **pedidos** (N:M → tabla intermedia `pedido_productos`)
-
----
-
-##  Diccionario de Datos
-
-### Tabla: `categorias`
-| Campo | Tipo | PK | FK | Restricción | Descripción |
-|-------|------|----|----|-------------|-------------|
-| id | INTEGER | ✅ | ❌ | AUTOINCREMENT | Identificador único |
-| nombre | TEXT | ❌ | ❌ | NOT NULL, UNIQUE | Nombre de la categoría |
-| descripcion | TEXT | ❌ | ❌ | DEFAULT '' | Descripción opcional |
-| activa | INTEGER | ❌ | ❌ | DEFAULT 1, CHECK(0,1) | 1=activa, 0=inactiva |
-
-### Tabla: `usuarios`
-| Campo | Tipo | PK | FK | Restricción | Descripción |
-|-------|------|----|----|-------------|-------------|
-| id | INTEGER | ✅ | ❌ | AUTOINCREMENT | Identificador único |
-| nombre | TEXT | ❌ | ❌ | NOT NULL | Nombre completo |
-| email | TEXT | ❌ | ❌ | NOT NULL, UNIQUE | Correo electrónico |
-| rol | TEXT | ❌ | ❌ | CHECK(admin,cliente,vendedor) | Rol del usuario |
-| activo | INTEGER | ❌ | ❌ | DEFAULT 1, CHECK(0,1) | 1=activo, 0=inactivo |
-
-### Tabla: `productos`
-| Campo | Tipo | PK | FK | Restricción | Descripción |
-|-------|------|----|----|-------------|-------------|
-| id | INTEGER | ✅ | ❌ | AUTOINCREMENT | Identificador único |
-| nombre | TEXT | ❌ | ❌ | NOT NULL | Nombre del producto |
-| precio | REAL | ❌ | ❌ | NOT NULL, CHECK(>0) | Precio de venta |
-| categoriaId | INTEGER | ❌ | ✅ | FK → categorias.id | Categoría del producto |
-| stock | INTEGER | ❌ | ❌ | DEFAULT 0, CHECK(>=0) | Unidades disponibles |
-| activo | INTEGER | ❌ | ❌ | DEFAULT 1, CHECK(0,1) | 1=activo, 0=inactivo |
-
-### Tabla: `pedidos`
-| Campo | Tipo | PK | FK | Restricción | Descripción |
-|-------|------|----|----|-------------|-------------|
-| id | INTEGER | ✅ | ❌ | AUTOINCREMENT | Identificador único |
-| usuarioId | INTEGER | ❌ | ✅ | FK → usuarios.id | Usuario que hizo el pedido |
-| total | REAL | ❌ | ❌ | DEFAULT 0, CHECK(>=0) | Total calculado automáticamente |
-| estado | TEXT | ❌ | ❌ | CHECK(pendiente,procesando,enviado,entregado,cancelado) | Estado del pedido |
-| fecha | TEXT | ❌ | ❌ | DEFAULT date('now') | Fecha de creación automática |
-
-### Tabla: `pedido_productos` (intermedia N:M)
-| Campo | Tipo | PK | FK | Restricción | Descripción |
-|-------|------|----|----|-------------|-------------|
-| id | INTEGER | ✅ | ❌ | AUTOINCREMENT | Identificador único |
-| pedidoId | INTEGER | ❌ | ✅ | FK → pedidos.id | Pedido al que pertenece |
-| productoId | INTEGER | ❌ | ✅ | FK → productos.id | Producto incluido |
-| cantidad | INTEGER | ❌ | ❌ | NOT NULL, CHECK(>0) | Cantidad pedida |
-| precioUnit | REAL | ❌ | ❌ | NOT NULL, CHECK(>0) | Precio unitario al comprar |
 
 ---
 
 ##  Endpoints
 
-###  API 1 – Productos `/productos`
+> **Base URL producción:** `https://tienda-virtual-1-lvbf.onrender.com`  
+> **Header requerido en todas las peticiones:** `password: MiPasswordSegura2024`
+
+###  Productos `/productos`
 
 | Método | Ruta | Descripción | Código |
 |--------|------|-------------|--------|
-| GET | `/productos` | Listar todos (filtros: ?nombre= ?categoriaId= ?activo=) | 200 |
+| GET | `/productos` | Listar todos | 200 |
 | GET | `/productos/:id` | Obtener por ID | 200 / 404 |
 | POST | `/productos` | Crear producto | 201 / 400 |
-| PUT | `/productos/:id` | Actualizar producto | 200 / 404 |
-| DELETE | `/productos/:id` | Eliminar producto | 200 / 404 |
+| PUT | `/productos/:id` | Actualizar | 200 / 404 |
+| DELETE | `/productos/:id` | Eliminar | 200 / 404 |
 
-**Header leído:** `Authorization`
-
-**Validaciones POST:**
-- `nombre`, `precio`, `categoriaId` son obligatorios
-- `precio` debe ser número mayor a 0
-- `stock` debe ser entero mayor o igual a 0
-- `categoriaId` debe existir en la base de datos
-
----
-
-###  API 2 – Categorías `/categorias`
+###  Categorías `/categorias`
 
 | Método | Ruta | Descripción | Código |
 |--------|------|-------------|--------|
-| GET | `/categorias` | Listar todas (filtros: ?nombre= ?activa=) | 200 |
+| GET | `/categorias` | Listar todas | 200 |
 | GET | `/categorias/:id` | Obtener por ID | 200 / 404 |
 | POST | `/categorias` | Crear categoría | 201 / 400 |
-| PUT | `/categorias/:id` | Actualizar categoría | 200 / 404 |
-| DELETE | `/categorias/:id` | Eliminar categoría | 200 / 404 |
+| PUT | `/categorias/:id` | Actualizar | 200 / 404 |
+| DELETE | `/categorias/:id` | Eliminar | 200 / 404 |
 
-**Header leído:** `Accept-Language`
-
-**Validaciones POST:**
-- `nombre` es obligatorio y mínimo 2 caracteres
-- `nombre` debe ser único (no puede repetirse)
-
----
-
-###  API 3 – Usuarios `/usuarios`
+###  Usuarios `/usuarios`
 
 | Método | Ruta | Descripción | Código |
 |--------|------|-------------|--------|
-| GET | `/usuarios` | Listar todos (filtros: ?nombre= ?rol= ?activo=) | 200 |
+| GET | `/usuarios` | Listar todos | 200 |
 | GET | `/usuarios/:id` | Obtener por ID | 200 / 404 |
 | POST | `/usuarios` | Registrar usuario | 201 / 400 |
-| PUT | `/usuarios/:id` | Actualizar usuario | 200 / 404 |
-| DELETE | `/usuarios/:id` | Eliminar usuario | 200 / 404 |
+| PUT | `/usuarios/:id` | Actualizar | 200 / 404 |
+| DELETE | `/usuarios/:id` | Eliminar | 200 / 404 |
 
-**Header leído:** `Authorization`
-
-**Validaciones POST:**
-- `nombre` y `email` son obligatorios
-- `email` debe tener formato válido (usuario@dominio.com)
-- `email` debe ser único (no puede repetirse)
-- `rol` debe ser: `admin`, `cliente` o `vendedor`
-
----
-
-###  API 4 – Pedidos `/pedidos`
+###  Pedidos `/pedidos`
 
 | Método | Ruta | Descripción | Código |
 |--------|------|-------------|--------|
-| GET | `/pedidos` | Listar todos (filtros: ?estado= ?usuarioId=) | 200 |
+| GET | `/pedidos` | Listar todos | 200 |
 | GET | `/pedidos/:id` | Obtener por ID | 200 / 404 |
 | POST | `/pedidos` | Crear pedido | 201 / 400 |
-| PUT | `/pedidos/:id` | Actualizar estado | 200 / 400 / 404 |
-| DELETE | `/pedidos/:id` | Eliminar pedido | 200 / 404 |
-
-**Headers leídos:** `Authorization`, `X-App-Source`
-
-**Validaciones POST:**
-- `usuarioId` es obligatorio y debe existir en la base de datos
-- `productos` debe ser un array con al menos 1 item
-- Cada producto debe tener `productoId`, `cantidad` y `precioUnit`
-- `cantidad` debe ser entero mayor a 0
-- `precioUnit` debe ser número mayor a 0
-- `total` se calcula automáticamente
-
-**Estados válidos:** `pendiente`, `procesando`, `enviado`, `entregado`, `cancelado`
+| PUT | `/pedidos/:id` | Actualizar estado | 200 / 404 |
+| DELETE | `/pedidos/:id` | Eliminar | 200 / 404 |
 
 ---
 
-##  Formato de Respuestas
+##  Códigos de autenticación
 
-**Exitosa (201 Created):**
-```json
-{
-  "success": true,
-  "message": "Producto creado correctamente",
-  "data": { "id": 1, "nombre": "Laptop HP", "precio": 2500000 }
-}
-```
+| Código | Causa |
+|--------|-------|
+| `401` | No se envió el header `password` |
+| `403` | La password es incorrecta |
 
-**Exitosa con lista (200 OK):**
-```json
-{
-  "success": true,
-  "total": 3,
-  "data": [ ... ]
-}
-```
+---
 
-**No encontrado (404):**
-```json
-{
-  "success": false,
-  "message": "Producto con id 99 no encontrado"
-}
-```
+##  Ejemplos con curl
 
-**Datos inválidos (400):**
-```json
-{
-  "success": false,
-  "message": "precio debe ser un número mayor a 0"
-}
+```bash
+# Listar productos
+curl https://tienda-virtual-1-lvbf.onrender.com/productos \
+  -H "password: MiPasswordSegura2024"
+
+# Crear categoría
+curl -X POST https://tienda-virtual-1-lvbf.onrender.com/categorias \
+  -H "password: MiPasswordSegura2024" \
+  -H "Content-Type: application/json" \
+  -d '{"nombre":"Tecnología","descripcion":"Dispositivos electrónicos"}'
 ```
 
 ---
 
-##  Pruebas en Postman — Orden correcto
-
-Insertar datos en este orden para respetar las llaves foráneas:
+##  Orden correcto para insertar datos
 
 ```
-1. POST /categorias   → crear categoría primero
-2. POST /usuarios     → crear usuario
-3. POST /productos    → crear producto (necesita categoriaId)
-4. POST /pedidos      → crear pedido (necesita usuarioId y productoId)
+1. POST /categorias   → primero
+2. POST /usuarios     → segundo
+3. POST /productos    → tercero (necesita categoriaId)
+4. POST /pedidos      → último (necesita usuarioId y productoId)
 ```
 
 ---
 
 ##  Notas
 
-- Los datos se almacenan en **SQLite** (`database.db`) y son **persistentes** — no se pierden al reiniciar el servidor.
-- El archivo `database.db` se genera automáticamente al iniciar el servidor por primera vez.
-- `database.db` y `node_modules/` están en `.gitignore` y no se suben a GitHub.
+- Los datos en Render se pierden al redesplegar — es normal en el plan gratuito.
+- `database.db`, `node_modules/` y `.env` están en `.gitignore` y no se suben a GitHub.

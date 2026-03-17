@@ -1,12 +1,14 @@
 {
   "name": "tienda-virtual-api",
-  "version": "2.0.0",
-  "description": "API REST Tienda Virtual con SQLite - SENA Guía 2",
+  "version": "3.0.0",
+  "description": "API REST Tienda Virtual con SQLite - SENA Guía 3 - Despliegue en Render",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
   "dependencies": {
+    "dotenv": "^16.6.1",
     "express": "^4.22.1",
     "sqlite3": "^5.1.7"
   },
